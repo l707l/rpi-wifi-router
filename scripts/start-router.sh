@@ -2,7 +2,8 @@
 # ============================================================
 # start-router.sh - Iniciar RPi WiFi Router + Pi-hole
 # ============================================================
-set -e
+# Don't use set -e: we want to continue even if some steps partially fail
+# (e.g., wlan0 already exists, services already running)
 
 WIFI_IFACE="wlan0"
 ETH_IFACE="eth0"
@@ -19,11 +20,16 @@ echo "[*] === RPi WiFi Router + Pi-hole ==="
 echo "[1/7] IP forwarding..."
 sudo sysctl -w net.ipv4.ip_forward=1
 
-# 2. Flush existing IP config on wlan0
-echo "[2/7] Configuring wlan0..."
-sudo ip link set wlan0 down 2>/dev/null || true
-sudo iw dev wlan0 set type __ap 2>/dev/null || true
+# 2. Configure wlan0 AP interface
+echo "[2/7] Configuring wlan0 AP interface..."
+# Remove any existing wlan0 to avoid "Device or resource busy"
+sudo iw dev wlan0 del 2>/dev/null || true
+sleep 1
+# Create AP interface on phy0
+sudo iw phy phy0 interface add wlan0 type __ap
+# Set channel BEFORE hostapd (critical: driver loses channel after hostapd crash)
 sudo ip link set wlan0 up
+sudo iw dev wlan0 set channel 36
 sudo ip addr flush dev wlan0
 sudo ip addr add $LAN_SUBNET dev wlan0
 
@@ -69,7 +75,12 @@ EOF
 echo "[5/7] Starting dnsmasq (DHCP)..."
 sudo pkill dnsmasq 2>/dev/null || true
 sleep 1
-sudo /usr/sbin/dnsmasq --no-daemon --port=0 2>&1 | tee /tmp/dnsmasq.log &
+# Ensure leases file exists (dnsmasq won't create it if /var/lib/misc doesn't exist properly)
+sudo mkdir -p /var/lib/misc
+sudo touch /var/lib/misc/dnsmasq.leases
+sudo chmod 644 /var/lib/misc/dnsmasq.leases
+# NO PIPE - redirect to file only to avoid SIGPIPE killing the process
+sudo /usr/sbin/dnsmasq --no-daemon --port=0 > /tmp/dnsmasq.log 2>&1 &
 sleep 2
 
 # 6. Configure Pi-hole FTL
@@ -95,7 +106,8 @@ sleep 2
 echo "[8] Starting hostapd (AP)..."
 sudo pkill hostapd 2>/dev/null || true
 sleep 1
-sudo hostapd -B $HOSTAPD_CONF 2>&1 | tee /tmp/hostapd.log &
+# NO PIPE - redirect to file only to avoid SIGPIPE killing hostapd daemon
+sudo hostapd -B $HOSTAPD_CONF > /tmp/hostapd.log 2>&1
 sleep 2
 
 echo ""

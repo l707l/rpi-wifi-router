@@ -57,6 +57,7 @@ driver=nl80211
 ssid=$AP_SSID
 hw_mode=a
 channel=$AP_CHANNEL
+ieee80211n=1
 wmm_enabled=1
 macaddr_acl=0
 auth_algs=1

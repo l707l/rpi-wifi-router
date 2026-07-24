@@ -1,6 +1,6 @@
 # rpi-wifi-router
 
-WiFi Router AP on **Raspberry Pi Zero 2 W** — 5GHz hostapd + dnsmasq + nftables NAT.
+WiFi Router AP on **Raspberry Pi Zero 2 W** — 5GHz hostapd + **Pi-hole FTL v6.7** (DNS sinkhole) + dnsmasq (DHCP) + nftables NAT.
 
 Convierte cualquier Raspberry Pi con WiFi integrado (brcmfmac) en un router WiFi de alta velocidad en banda 5GHz. Los dispositivos se conectan a la red WiFi y obtienen IP del DHCP, con internet compartido desde ethernet.
 
@@ -37,8 +37,27 @@ sudo ./setup.sh
 | Servicio | Descripción |
 |---|---|
 | `hostapd` | Access point WiFi 5GHz |
-| `dnsmasq` | Servidor DHCP + DNS |
+| `pihole-FTL` | Servidor DNS + sinkhole de publicidad (puerto 53) |
+| `dnsmasq` | Servidor DHCP (puerto 67), DNS deshabilitado (--port=0) |
 | `nftables` | NAT/masquerade desde eth0 a wlan0 |
+
+## Pi-hole DNS sinkhole
+
+Pi-hole FTL actúa como servidor DNS en el puerto 53, bloqueando publicidad y trackers antes de que lleguen a los dispositivos. Los upstream DNS son Google (8.8.8.8, 8.8.4.4).
+
+Para configurar el admin de Pi-hole (opcional):
+```bash
+# Después de instalar, acceder a la interfaz web
+# http://192.168.2.1/admin/
+# O desde otro equipo en la misma red
+```
+
+Para cambiar los upstream DNS o ver estadísticas:
+```bash
+# Ver logs de consultas DNS
+cat /var/lib/misc/dnsmasq.leases
+# o revisar los logs de pihole-FTL
+```
 
 ## Arranque automático
 
